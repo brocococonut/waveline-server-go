@@ -3,7 +3,8 @@ module github.com/brocococonut/waveline-server-go
 go 1.12
 
 require (
-	github.com/dhowden/tag v0.0.0-20191122115059-7e5c04feccd8
+	github.com/davecgh/go-spew v1.1.1
+	github.com/dhowden/tag v0.0.0-20191122115059-7e5c04feccd8 // indirect
 	github.com/labstack/echo v3.3.10+incompatible // indirect
 	github.com/labstack/echo/v4 v4.1.15
 	github.com/zmb3/spotify v0.0.0-20200112163645-71a4c67d18db

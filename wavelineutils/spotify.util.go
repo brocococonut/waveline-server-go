@@ -3,24 +3,23 @@ package wavelineutils
 import (
 	"context"
 	"log"
-	"os"
 
 	"golang.org/x/oauth2/clientcredentials"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/zmb3/spotify"
 )
 
 // Spotify - A spotify wrapper wrapper..
 type Spotify struct {
-	initialised bool
-	client      spotify.Client
+	client spotify.Client
 }
 
 // Authorize - Get an auth token from the spotify API
-func (s Spotify) Authorize() {
+func (s *Spotify) Authorize(spotifyClient, spotifySecret string) {
 	config := &clientcredentials.Config{
-		ClientID:     os.Getenv("SPOTIFY_ID"),
-		ClientSecret: os.Getenv("SPOTIFY_SECRET"),
+		ClientID:     spotifyClient,
+		ClientSecret: spotifySecret,
 		TokenURL:     spotify.TokenURL,
 	}
 
@@ -30,19 +29,16 @@ func (s Spotify) Authorize() {
 	}
 
 	s.client = spotify.Authenticator{}.NewClient(token)
-	s.initialised = true
 }
 
 // AlbumPicture - Retrieve the Album picture URL for a particular album query
-func (s Spotify) AlbumPicture(query string) string {
-	if s.initialised == false {
-		s.Authorize()
-	}
-
-	res, err := s.client.Search(query, spotify.SearchTypeArtist)
+func (s *Spotify) AlbumPicture(query string) string {
+	res, err := s.client.Search(query, spotify.SearchTypeAlbum)
 	if err != nil {
 		log.Print(err)
 	}
+
+	spew.Dump(res)
 
 	if len(res.Albums.Albums) > 0 {
 		if len(res.Albums.Albums[0].Images) > 0 {
@@ -50,15 +46,13 @@ func (s Spotify) AlbumPicture(query string) string {
 		}
 	}
 
+	spew.Dump(res.Albums.Albums[0])
+
 	return ""
 }
 
 // ArtistPicture - Retrieve the Artist picture URL for a particular album query
-func (s Spotify) ArtistPicture(query string) string {
-	if s.initialised == false {
-		s.Authorize()
-	}
-
+func (s *Spotify) ArtistPicture(query string) string {
 	res, err := s.client.Search(query, spotify.SearchTypeArtist)
 	if err != nil {
 		log.Print(err)

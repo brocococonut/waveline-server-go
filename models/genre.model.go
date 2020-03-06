@@ -1,4 +1,4 @@
-package model
+package models
 
 // Genre - Genre model
 type Genre struct {
