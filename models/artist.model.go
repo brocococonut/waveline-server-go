@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/brocococonut/waveline-server-go/wavelineutils"
+	"github.com/brocococonut/waveline-server-go/wavespotify"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -13,38 +13,36 @@ import (
 
 // Artist - an artist of music stored in the DB
 type Artist struct {
-	ID        primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
-	Name      string             `json:"name,omitempty" bson:"name,omitempty"`
-	Picture   string             `json:"picture,omitempty" bson:"picture,omitempty"`
-	CreatedAt time.Time          `json:"created_at,omitempty" bson:"created_at,omitempty"`
+	ID        primitive.ObjectID `json:"_id" bson:"_id"`
+	Name      string             `json:"name" bson:"name"`
+	Picture   string             `json:"picture" bson:"picture"`
+	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
 }
 
-func (*Artist) findOrCreate(
-	col *mongo.Collection,
+// FindOrCreate - Find or create an artist document
+func (*Artist) FindOrCreate(
+	db *mongo.Database,
 	names []string,
 	spotifyClient, spotifySecret string,
 ) (artists []Artist, err error) {
-	spot := wavelineutils.Spotify{}
+	col := db.Collection("artists")
+	spot := wavespotify.Spotify{}
 	spot.Authorize(spotifyClient, spotifySecret)
 
 	// Loop over names to find artists
 	for _, name := range names {
 		var artist Artist
 
-		// Find the artist
-		if err = col.FindOne(context.TODO(), bson.M{
-			name: name,
-		}).Decode(&artist); err != nil {
-			continue
-		}
-
-		// Create a new artist if that one didn't exist
-		if artist.Name == "" {
+		// Check to see if the artist already exists
+		if err := col.FindOne(context.TODO(), bson.M{
+			"name": name,
+		}).Decode(&artist); err != nil && err.Error() == mongo.ErrNoDocuments.Error() {
+			// Artist not found, construct one
 			artist = Artist{
 				ID:        primitive.NewObjectID(),
 				Name:      name,
 				CreatedAt: time.Now(),
-				Picture:   spot.ArtistPicture(fmt.Sprintf("album:%s artist:%s", "", name)),
+				Picture:   spot.ArtistPicture(fmt.Sprintf("artist:%s", name)),
 			}
 
 			// Insert the new artist to the db

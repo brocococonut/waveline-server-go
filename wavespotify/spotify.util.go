@@ -1,4 +1,4 @@
-package wavelineutils
+package wavespotify
 
 import (
 	"context"
@@ -35,18 +35,14 @@ func (s *Spotify) Authorize(spotifyClient, spotifySecret string) {
 func (s *Spotify) AlbumPicture(query string) string {
 	res, err := s.client.Search(query, spotify.SearchTypeAlbum)
 	if err != nil {
-		log.Print(err)
+		spew.Dump(err)
 	}
-
-	spew.Dump(res)
 
 	if len(res.Albums.Albums) > 0 {
 		if len(res.Albums.Albums[0].Images) > 0 {
 			return res.Albums.Albums[0].Images[0].URL
 		}
 	}
-
-	spew.Dump(res.Albums.Albums[0])
 
 	return ""
 }
@@ -55,7 +51,7 @@ func (s *Spotify) AlbumPicture(query string) string {
 func (s *Spotify) ArtistPicture(query string) string {
 	res, err := s.client.Search(query, spotify.SearchTypeArtist)
 	if err != nil {
-		log.Print(err)
+		spew.Dump(err)
 	}
 
 	if len(res.Artists.Artists) > 0 {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -15,6 +16,7 @@ type (
 		Client *mongo.Client
 		Env    struct {
 			Host          string
+			Port          string
 			DB            string
 			DBHost        string
 			DBPort        string
@@ -32,7 +34,13 @@ func (r *Router) InitEnv() {
 	if providedHost := os.Getenv("HOST"); providedHost != "" {
 		r.Env.Host = providedHost
 	} else {
-		r.Env.Host = "http://127.0.0.1"
+		r.Env.Host = "127.0.0.1"
+	}
+
+	if providedPort := os.Getenv("PORT"); providedPort != "" {
+		r.Env.Port = providedPort
+	} else {
+		r.Env.Port = ":1323"
 	}
 
 	if providedPath := os.Getenv("ART_PATH"); providedPath != "" {
@@ -46,6 +54,12 @@ func (r *Router) InitEnv() {
 	} else {
 		r.Env.MusicPath = fmt.Sprintf("%s/music", cwd)
 	}
+
+	r.Env.MusicPath, _ = filepath.Abs(r.Env.MusicPath)
+	r.Env.AlbumArtPath, _ = filepath.Abs(r.Env.AlbumArtPath)
+
+	os.MkdirAll(r.Env.MusicPath, 0704)
+	os.MkdirAll(r.Env.AlbumArtPath, 0704)
 
 	if providedStr := os.Getenv("DB"); providedStr != "" {
 		r.Env.DB = providedStr
