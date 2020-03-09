@@ -2,13 +2,17 @@ package routes
 
 import (
 	"context"
+	"time"
 
 	"github.com/brocococonut/waveline-server-go/models"
 	"github.com/labstack/echo/v4"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2/bson"
 )
 
+// PlaylistsIndex - Get your playlists
+// GET /playlists/
 func (r *Router) PlaylistsIndex(c echo.Context) (err error) {
 	playlists := []models.PlaylistExtended{}
 
@@ -47,6 +51,7 @@ func (r *Router) PlaylistsIndex(c echo.Context) (err error) {
 		"favourited": true,
 	})
 
+	// Add Favourites playlist to the slice
 	playlists = append(playlists, models.PlaylistExtended{
 		Name:     "Favourites",
 		ID:       "FAVOURITES",
@@ -56,7 +61,8 @@ func (r *Router) PlaylistsIndex(c echo.Context) (err error) {
 	})
 
 	playlistTemps := []models.PlaylistExtended{}
-	// Get the other playlists
+
+	// Retrieve the other playlists
 	playlistPipe := []bson.M{
 		bson.M{"$match": bson.M{}},
 		bson.M{"$lookup": bson.M{
@@ -71,287 +77,248 @@ func (r *Router) PlaylistsIndex(c echo.Context) (err error) {
 			"foreignField": "_id",
 			"as":           "tracks.album",
 		}},
-		bson.M{"$unwind": "$album"},
 		bson.M{"$lookup": bson.M{
 			"from":         "artists",
 			"localField":   "tracks.artists",
 			"foreignField": "_id",
 			"as":           "tracks.artists",
 		}},
+		bson.M{
+			"$project": bson.M{
+				"_id":  1,
+				"name": 1,
+				"pictures": bson.M{
+					"$cond": bson.M{
+						"if": bson.M{"$isArray": "$tracks"},
+						"then": bson.M{
+							"$map": bson.M{
+								"input": "$tracks",
+								"as":    "track",
+								"in":    "$$track.album",
+							},
+						},
+						"else": "$tracks.album.picture",
+					},
+				},
+				"tracks": bson.M{
+					"$cond": bson.M{
+						"if":   bson.M{"$isArray": "$tracks"},
+						"then": bson.M{"$size": "$tracks"},
+						"else": bson.M{
+							"$cond": bson.M{
+								"if": bson.M{
+									"$not": "tracks",
+								},
+								"then": 0,
+								"else": 1,
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	var playlistCur *mongo.Cursor
 	if playlistCur, err = r.Client.Database(r.Env.DB).Collection("playlists").Aggregate(context.TODO(), playlistPipe); err != nil {
 		return c.JSON(500, err)
 	}
-	playlistCur.All(context.TODO(), &playlistTemps)
+	if err := playlistCur.All(context.TODO(), &playlistTemps); err != nil {
+		return c.JSON(500, err)
+	}
 
-	return nil
+	playlists = append(playlists, playlistTemps...)
+
+	return c.JSON(200, playlists)
 }
 
-// func (r *Router) PlaylistsIndexPost(c echo.Context) (err error) {}
+// PlaylistsIndexPost - Create a new playlist
+// POST /playlists
+func (r *Router) PlaylistsIndexPost(c echo.Context) (err error) {
+	plist := models.PlaylistBasic{}
 
-// func (r *Router) PlaylistsPlaylistTrack(c echo.Context) (err error) {}
+	plist.CreatedAt = time.Now()
+	plist.UpdatedAt = time.Now()
 
-// func (r *Router) PlaylistsPlaylist(c echo.Context) (err error) {}
-// func (r *Router) PlaylistsPlaylistPut(c echo.Context) (err error) {}
-// func (r *Router) PlaylistsPlaylistDelete(c echo.Context) (err error) {}
-// AlbumsNew - Get the 10 newest albums
-// func (r *Router) AlbumsNew(c echo.Context) (err error) {
-// 	albums := []map[string]interface{}{}
+	if err := c.Bind(&plist); err != nil {
+		return c.JSON(500, err)
+	}
 
-// 	pipe := []bson.M{
-// 		bson.M{"$match": bson.M{}},
-// 		bson.M{"$limit": 10},
-// 		bson.M{"$sort": bson.M{
-// 			"created_at": -1,
-// 		}},
-// 		bson.M{"$lookup": bson.M{
-// 			"from":         "artists",
-// 			"localField":   "artist",
-// 			"foreignField": "_id",
-// 			"as":           "artist",
-// 		}},
-// 		bson.M{"$unwind": "$artist"},
-// 		bson.M{"$lookup": bson.M{
-// 			"from":         "artists",
-// 			"localField":   "artists",
-// 			"foreignField": "_id",
-// 			"as":           "artists",
-// 		}},
-// 		// bson.M{"$unwind": "$popArtists"},
-// 	}
+	plist.ID = primitive.NewObjectID()
 
-// 	var albumCur *mongo.Cursor
-// 	if albumCur, err = r.Client.Database(r.Env.DB).Collection("albums").Aggregate(context.TODO(), pipe); err != nil {
-// 		return c.JSON(500, err)
-// 	}
+	if _, err := r.Client.
+		Database(r.Env.DB).
+		Collection("playlists").
+		InsertOne(context.TODO(), plist); err != nil {
+		return c.JSON(500, err)
+	}
 
-// 	albumCur.All(context.TODO(), &albums)
+	return c.JSON(200, plist)
+}
 
-// 	return c.JSON(200, albums)
-// }
+// PlaylistsPlaylistTrack - Add a track to an existing playlist
+// GET /playlists/:id/:track
+func (r *Router) PlaylistsPlaylistTrack(c echo.Context) (err error) {
+	var (
+		idStr     = c.Param("id")
+		trackStr  = c.Param("track")
+		id, track primitive.ObjectID
+	)
 
-// // AlbumsArt - Find artwork from a file hash
-// func (r *Router) AlbumsArt(c echo.Context) (err error) {
-// 	idStr := c.Param("id")
+	if id, err = primitive.ObjectIDFromHex(idStr); err != nil {
+		return err
+	}
+	if track, err = primitive.ObjectIDFromHex(trackStr); err != nil {
+		return err
+	}
 
-// 	idStr = filepath.Clean(idStr)
+	if _, err = r.Client.
+		Database(r.Env.DB).
+		Collection("playlists").
+		UpdateOne(context.TODO(), bson.M{
+			"_id": id,
+		}, bson.M{
+			"$addToSet": bson.M{
+				"tracks": track,
+			},
+		}); err != nil {
+		return err
+	}
 
-// 	path := fmt.Sprintf("%s/%s", r.Env.AlbumArtPath, idStr)
+	return c.JSON(200, bson.M{})
+}
 
-// 	return c.File(path)
-// }
+// PlaylistsPlaylist - Get a particular playlist
+// GET /playlists/:id
+func (r *Router) PlaylistsPlaylist(c echo.Context) (err error) {
+	var (
+		idStr = c.Param("id")
+		id    primitive.ObjectID
+	)
 
-// // AlbumsIndex - Get a stream of albums
-// func (r *Router) AlbumsIndex(c echo.Context) (err error) {
-// 	albums := []map[string]interface{}{}
+	if id, err = primitive.ObjectIDFromHex(idStr); err != nil {
+		return err
+	}
 
-// 	var (
-// 		limitQuery = c.QueryParam("limit")
-// 		skipQuery  = c.QueryParam("skip")
-// 		limit      = 25
-// 		skip       = 0
-// 	)
+	var plist map[string]interface{}
 
-// 	if limitQuery == "" {
-// 		limit = 25
-// 	} else {
-// 		if limit, err = strconv.Atoi(limitQuery); err != nil {
-// 			c.Logger().Error(err)
-// 			return err
-// 		}
-// 	}
-// 	if skipQuery == "" {
-// 		skip = 0
-// 	} else {
-// 		if skip, err = strconv.Atoi(skipQuery); err != nil {
-// 			c.Error(err)
-// 		}
-// 	}
+	// Get the playlist and map it to a basic map
+	if err := r.Client.
+		Database(r.Env.DB).
+		Collection("playlists").
+		FindOne(context.TODO(), bson.M{
+			"_id": id,
+		}).
+		Decode(&plist); err != nil {
+		return err
+	}
 
-// 	if limit > 200 || limit < 1 {
-// 		limit = 25
-// 	}
-// 	if skip < 0 {
-// 		skip = 0
-// 	}
+	if plist["tracks"] == nil {
+		return c.JSON(400, bson.M{})
+	}
 
-// 	pipe := []bson.M{
-// 		bson.M{"$match": bson.M{}},
-// 		bson.M{"$skip": skip},
-// 		bson.M{"$limit": limit},
-// 		bson.M{"$sort": bson.M{
-// 			"created_at": -1,
-// 		}},
-// 		bson.M{"$lookup": bson.M{
-// 			"from":         "artists",
-// 			"localField":   "artist",
-// 			"foreignField": "_id",
-// 			"as":           "artist",
-// 		}},
-// 		bson.M{"$unwind": "$artist"},
-// 		bson.M{"$lookup": bson.M{
-// 			"from":         "artists",
-// 			"localField":   "artists",
-// 			"foreignField": "_id",
-// 			"as":           "artists",
-// 		}},
-// 		// bson.M{"$unwind": "$popArtists"},
-// 	}
+	// Retrieve and populate the fields of the tracks
+	tracksPipe := []bson.M{
+		bson.M{"$match": bson.M{
+			"_id": bson.M{
+				"$in": plist["tracks"],
+			},
+		}},
+		bson.M{"$lookup": bson.M{
+			"from":         "albums",
+			"localField":   "album",
+			"foreignField": "_id",
+			"as":           "album",
+		}},
+		bson.M{"$unwind": "$album"},
 
-// 	var albumCur *mongo.Cursor
-// 	if albumCur, err = r.Client.Database(r.Env.DB).Collection("albums").Aggregate(context.TODO(), pipe); err != nil {
-// 		return c.JSON(500, err)
-// 	}
+		bson.M{"$lookup": bson.M{
+			"from":         "artists",
+			"localField":   "artists",
+			"foreignField": "_id",
+			"as":           "artists",
+		}},
 
-// 	albumCur.All(context.TODO(), &albums)
+		bson.M{"$lookup": bson.M{
+			"from":         "genres",
+			"localField":   "genre",
+			"foreignField": "_id",
+			"as":           "genre",
+		}},
+		bson.M{"$unwind": "$genre"},
+	}
 
-// 	return c.JSON(200, albums)
-// }
+	var tracks []models.TrackExtended
 
-// // AlbumsArtists - Get albums by a particular artist
-// func (r *Router) AlbumsArtists(c echo.Context) (err error) {
-// 	var (
-// 		albums = []map[string]interface{}{}
-// 		idStr  = c.Param("id")
-// 		// id     primitive.ObjectID
-// 	)
+	var tracksCur *mongo.Cursor
+	if tracksCur, err = r.Client.
+		Database(r.Env.DB).
+		Collection("tracks").
+		Aggregate(context.TODO(), tracksPipe); err != nil {
+		return c.JSON(500, err)
+	}
 
-// 	id, err := primitive.ObjectIDFromHex(idStr)
-// 	if err != nil {
-// 		return err
-// 	}
+	if err := tracksCur.All(context.TODO(), &tracks); err != nil {
+		return c.JSON(500, err)
+	}
 
-// 	pipe := []bson.M{
-// 		bson.M{"$match": bson.M{
-// 			"artist": id,
-// 		}},
-// 		bson.M{"$lookup": bson.M{
-// 			"from":         "artists",
-// 			"localField":   "artist",
-// 			"foreignField": "_id",
-// 			"as":           "artist",
-// 		}},
-// 		bson.M{"$unwind": "$artist"},
-// 		bson.M{"$lookup": bson.M{
-// 			"from":         "artists",
-// 			"localField":   "artists",
-// 			"foreignField": "_id",
-// 			"as":           "artists",
-// 		}},
-// 	}
+	plist["tracks"] = tracks
 
-// 	var albumCur *mongo.Cursor
-// 	if albumCur, err = r.Client.Database(r.Env.DB).Collection("albums").Aggregate(context.TODO(), pipe); err != nil {
-// 		return c.JSON(500, err)
-// 	}
+	return c.JSON(200, plist)
+}
 
-// 	albumCur.All(context.TODO(), &albums)
+// PlaylistsPlaylistPut - Update a playlists name or tracks
+// PUT /playlists/:id
+func (r *Router) PlaylistsPlaylistPut(c echo.Context) (err error) {
+	var (
+		idStr = c.Param("id")
+		id    primitive.ObjectID
+	)
 
-// 	return c.JSON(200, albums)
-// }
+	if id, err = primitive.ObjectIDFromHex(idStr); err != nil {
+		return err
+	}
 
-// // AlbumsRandom - Get 10 random albums
-// func (r *Router) AlbumsRandom(c echo.Context) (err error) {
-// 	// albums := []map[string]interface{}{}
-// 	type tempAlbum struct {
-// 		Artists    interface{} `json:"artists" bson:"artists"`
-// 		Year       interface{} `json:"year" bson:"year"`
-// 		CreatedAt  interface{} `json:"created_at" bson:"created_at"`
-// 		ID         interface{} `json:"_id" bson:"_id"`
-// 		Name       interface{} `json:"name" bson:"name"`
-// 		Artist     interface{} `json:"artist" bson:"artist"`
-// 		ArtistsPop interface{} `json:"-" bson:"artistsPop"`
-// 		ArtistPop  interface{} `json:"-" bson:"artistPop"`
-// 	}
-// 	albums := []tempAlbum{}
+	plist := models.PlaylistBasic{}
 
-// 	var (
-// 		albumCur *mongo.Cursor
-// 		min      float64
-// 		n        = []tempAlbum{}
-// 		iterMax  = 10
-// 	)
+	plist.UpdatedAt = time.Now()
 
-// 	pipe := []bson.M{
-// 		bson.M{"$lookup": bson.M{
-// 			"from":         "artists",
-// 			"localField":   "artist",
-// 			"foreignField": "_id",
-// 			"as":           "artist",
-// 		}},
-// 		bson.M{"$unwind": "$artist"},
-// 		bson.M{"$lookup": bson.M{
-// 			"from":         "artists",
-// 			"localField":   "artists",
-// 			"foreignField": "_id",
-// 			"as":           "artists",
-// 		}},
-// 	}
+	if err := c.Bind(&plist); err != nil {
+		return c.JSON(500, err)
+	}
 
-// 	if albumCur, err = r.Client.Database(r.Env.DB).Collection("albums").Aggregate(context.TODO(), pipe); err != nil {
-// 		return c.JSON(500, err)
-// 	}
+	plist.ID = id
 
-// 	err = albumCur.All(context.TODO(), &albums)
+	if _, err := r.Client.
+		Database(r.Env.DB).
+		Collection("playlists").
+		UpdateOne(context.TODO(), bson.M{
+			"_id": id,
+		}, plist); err != nil {
+		return c.JSON(500, err)
+	}
 
-// 	if len(albums) < iterMax {
-// 		iterMax = len(albums)
-// 	}
+	return c.JSON(200, plist)
+}
 
-// 	for i := 0; i < 10; i++ {
-// 		var ind = int(math.Floor(rand.Float64()*(float64(len(albums))-min+1)) + min)
-// 		if ind >= len(albums) {
-// 			ind = len(albums) - 1
-// 		}
-// 		n = append(n, albums[ind])
-// 	}
+// PlaylistsPlaylistDelete - Remove a playlist
+// DELETE /playlists/:id
+func (r *Router) PlaylistsPlaylistDelete(c echo.Context) (err error) {
+	var (
+		idStr = c.Param("id")
+		id    primitive.ObjectID
+	)
 
-// 	return c.JSON(200, n)
-// }
+	if id, err = primitive.ObjectIDFromHex(idStr); err != nil {
+		return err
+	}
 
-// // AlbumsAlbum - Get a specific album
-// func (r *Router) AlbumsAlbum(c echo.Context) (err error) {
-// 	var (
-// 		albums = []map[string]interface{}{}
-// 		idStr  = c.Param("id")
-// 	)
+	r.Client.
+		Database(r.Env.DB).
+		Collection("playlists").
+		FindOneAndDelete(context.TODO(), bson.M{
+			"_id": id,
+		})
 
-// 	id, err := primitive.ObjectIDFromHex(idStr)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	pipe := []bson.M{
-// 		bson.M{"$match": bson.M{
-// 			"_id": id,
-// 		}},
-// 		bson.M{"$lookup": bson.M{
-// 			"from":         "artists",
-// 			"localField":   "artist",
-// 			"foreignField": "_id",
-// 			"as":           "artist",
-// 		}},
-// 		bson.M{"$unwind": "$artist"},
-// 		bson.M{"$lookup": bson.M{
-// 			"from":         "artists",
-// 			"localField":   "artists",
-// 			"foreignField": "_id",
-// 			"as":           "artists",
-// 		}},
-// 	}
-
-// 	var albumCur *mongo.Cursor
-// 	if albumCur, err = r.Client.Database(r.Env.DB).Collection("albums").Aggregate(context.TODO(), pipe); err != nil {
-// 		return c.JSON(500, err)
-// 	}
-
-// 	albumCur.All(context.TODO(), &albums)
-
-// 	if len(albums) == 0 {
-// 		return c.JSON(404, map[string]interface{}{})
-// 	}
-
-// 	return c.JSON(200, albums[0])
-// }
+	return c.JSON(200, bson.M{})
+}

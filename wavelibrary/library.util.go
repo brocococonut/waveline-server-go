@@ -36,6 +36,7 @@ type fileType struct {
 	Path string
 }
 
+// ExtractMeta - Extract song metadata from the tags
 func (l *Library) ExtractMeta(files []fileType) (tracks []models.Track) {
 	for _, file := range files {
 		// var genre models.Genre
@@ -49,6 +50,7 @@ func (l *Library) ExtractMeta(files []fileType) (tracks []models.Track) {
 			continue
 		}
 
+		// Attempt to get Metadata from file
 		// Open file for meta reading
 		fileCur, err := os.Open(file.Path)
 		if err != nil {
@@ -91,12 +93,6 @@ func (l *Library) ExtractMeta(files []fileType) (tracks []models.Track) {
 					Name: meta.Artist(),
 					ID:   artists[0].ID,
 				}
-			}
-
-			// Add picture if it exists
-			pic := meta.Picture()
-			if pic != nil && len(pic.Data) > 0 {
-				albumData.Picture = pic.Data
 			}
 
 			// Find/create album
@@ -176,10 +172,7 @@ func filterFiles(arr []fileType, cond func(fileType) bool) []fileType {
 	return result
 }
 
-func (l *Library) Download(url, file string) {
-
-}
-
+// Sync - Sync new files into the DB
 func (l *Library) Sync(artPath, path string, ext []string) (info models.Info, err error) {
 	println("Starting new sync, this may take a while")
 
@@ -218,7 +211,7 @@ func (l *Library) Sync(artPath, path string, ext []string) (info models.Info, er
 		return nil
 	})
 
-	var byteCount int64 = 0
+	var byteCount int64
 
 	// Filter out files that don't match the extension types
 	files = filterFiles(files, func(file fileType) bool {

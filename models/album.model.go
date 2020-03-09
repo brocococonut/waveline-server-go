@@ -26,8 +26,8 @@ type (
 		Year      int                  `json:"year,omitempty" bson:"year,omitempty"`
 		CreatedAt time.Time            `json:"created_at,omitempty" bson:"created_at,omitempty"`
 
-		ArtistPop  Artist   `json:"artist,omitempty" bson:"artistPop"`
-		ArtistsPop []Artist `json:"artists,omitempty" bson:"artistsPop"`
+		ArtistPop  Artist   `json:"-" bson:"artistPop"`
+		ArtistsPop []Artist `json:"-" bson:"artistsPop"`
 	}
 	// AlbumSearchData - Search data structure for the findOrCreate function
 	AlbumSearchData struct {
