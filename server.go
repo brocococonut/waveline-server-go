@@ -39,16 +39,17 @@ func auth(next echo.HandlerFunc) echo.HandlerFunc {
 			}
 
 			var reqKey string
-			keyAlt := c.QueryParam("x-api-key")
+
+			keyAlt := c.Request().Header.Get("x-api-key")
 			key := c.QueryParam("key")
 
 			if key == "" && keyAlt == "" {
 				return c.String(403, "API key missing")
 			}
-			if key == "" {
-				reqKey = keyAlt
-			} else {
+			if keyAlt == "" {
 				reqKey = key
+			} else {
+				reqKey = keyAlt
 			}
 
 			if apiKey := os.Getenv("API_KEY"); apiKey != reqKey {
