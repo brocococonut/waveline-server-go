@@ -20,6 +20,7 @@ type (
 			DB            string
 			DBHost        string
 			DBPort        string
+			DBString      string
 			AlbumArtPath  string
 			MusicPath     string
 			SpotifyClient string
@@ -75,6 +76,12 @@ func (r *Router) InitEnv() {
 		r.Env.DBPort = providedStr
 	} else {
 		r.Env.DBPort = "27017"
+	}
+
+	if providedStr := os.Getenv("MONGO_URL"); providedStr != "" {
+		r.Env.DBString = providedStr
+	} else {
+		r.Env.DBString = fmt.Sprintf("mongodb://%s:%s/%s", r.Env.Host, r.Env.Host, r.Env.DB)
 	}
 
 	if providedStr := os.Getenv("SPOTIFY_ID"); providedStr != "" {

@@ -74,7 +74,7 @@ func main() {
 	r.InitEnv()
 
 	// Set client options
-	clientOptions := options.Client().ApplyURI(fmt.Sprintf("mongodb://%s:%s/%s", r.Env.DBHost, r.Env.DBPort, r.Env.DB))
+	clientOptions := options.Client().ApplyURI(r.Env.DBString)
 
 	// Connect to MongoDB
 	client, err := mongo.Connect(context.TODO(), clientOptions)
