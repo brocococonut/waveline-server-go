@@ -24,6 +24,7 @@ type Library struct {
 		DB            string
 		DBHost        string
 		DBPort        string
+		DBString      string
 		AlbumArtPath  string
 		MusicPath     string
 		SpotifyClient string
