@@ -20,3 +20,5 @@ music/
 albumart/
 .env
 docker-compose.yml
+main
+waveline-server-go
