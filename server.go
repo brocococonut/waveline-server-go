@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"strings"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/skip2/go-qrcode"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -41,7 +43,6 @@ func auth(next echo.HandlerFunc) echo.HandlerFunc {
 			key := c.QueryParam("key")
 
 			if key == "" && keyAlt == "" {
-				log.Println("hmm2")
 				return c.String(403, "API key missing")
 			}
 			if key == "" {
@@ -51,7 +52,6 @@ func auth(next echo.HandlerFunc) echo.HandlerFunc {
 			}
 
 			if apiKey := os.Getenv("API_KEY"); apiKey != reqKey {
-				log.Println("hmm1")
 				return c.String(403, "Invalid API key")
 			}
 
@@ -61,12 +61,6 @@ func auth(next echo.HandlerFunc) echo.HandlerFunc {
 		return next(c)
 	}
 }
-
-// "Content-Type": "application/json",
-// "Access-Control-Allow-Origin": "*",
-// "Access-Control-Allow-Methods": "OPTIONS, DELETE, PUT, PATCH, POST, GET",
-// "Access-Control-Max-Age": 2592000,
-// "Access-Control-Allow-Headers": "*",
 
 func main() {
 	err := godotenv.Load()
@@ -96,6 +90,8 @@ func main() {
 	}
 
 	r.Client = client
+
+	// Middleware
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
@@ -107,10 +103,7 @@ func main() {
 
 	e.Use(auth)
 
-	// e.OPTIONS("*", func(c echo.Context) (err error) {
-	// 	return c.NoContent(204)
-	// })
-
+	// Routes
 	e.GET("/albums/new/", r.AlbumsNew)
 	e.GET("/albums/new", r.AlbumsNew)
 	e.GET("/albums/random/", r.AlbumsRandom)
@@ -151,5 +144,23 @@ func main() {
 	e.GET("/tracks/new/", r.TracksFavourites)
 	e.GET("/tracks/new", r.TracksFavourites)
 
-	e.Logger.Fatal(e.Start(fmt.Sprintf("%s%s", r.Env.Host, r.Env.Port)))
+	// Start generating host for qr code
+	host, err := url.Parse(r.Env.Host)
+	if err != nil {
+		e.Logger.Fatal("Failed to parse HOST string")
+	}
+
+	// Add API key to the host
+	q := host.Query()
+	q.Add("key", os.Getenv("API_KEY"))
+	host.RawQuery = q.Encode()
+
+	// Generate the QR code and display it in the terminal
+	qr, err := qrcode.New(host.String(), qrcode.High)
+	if err != nil {
+		e.Logger.Fatal("Failed to generate qr code")
+	}
+	println(qr.ToString(false))
+
+	e.Logger.Fatal(e.Start(fmt.Sprintf(":%s", r.Env.Port)))
 }

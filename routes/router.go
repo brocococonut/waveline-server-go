@@ -77,10 +77,10 @@ func (r *Router) InitEnv() {
 		r.Env.DBPort = "27017"
 	}
 
-	if providedStr := os.Getenv("SPOTIFY_CLIENT"); providedStr != "" {
+	if providedStr := os.Getenv("SPOTIFY_ID"); providedStr != "" {
 		r.Env.SpotifyClient = providedStr
 	} else {
-		log.Fatal("Missing \"SPOTIFY_CLIENT\" env variable")
+		log.Fatal("Missing \"SPOTIFY_ID\" env variable")
 	}
 	if providedStr := os.Getenv("SPOTIFY_SECRET"); providedStr != "" {
 		r.Env.SpotifySecret = providedStr

@@ -18,3 +18,5 @@
 
 music/
 albumart/
+.env
+docker-compose.yml
