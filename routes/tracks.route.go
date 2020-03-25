@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/brocococonut/waveline-server-go/models"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/labstack/echo/v4"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -42,16 +43,31 @@ func (r *Router) TracksIndex(c echo.Context) (err error) {
 		shuffle = true
 	}
 	if genreStr != "" {
-		lookup["genre"] = genreStr
+		if genreOID, err := primitive.ObjectIDFromHex(genreStr); err == nil {
+			lookup["genre"] = genreOID
+		} else {
+			spew.Dump(err)
+			lookup["genre"] = genreStr
+		}
 	}
 	if favouritesStr != "" && favouritesStr != "false" {
 		lookup["favourites"] = true
 	}
 	if artistStr != "" {
-		lookup["artist"] = artistStr
+		if artistOID, err := primitive.ObjectIDFromHex(artistStr); err == nil {
+			lookup["artist"] = artistOID
+		} else {
+			spew.Dump(err)
+			lookup["artist"] = artistStr
+		}
 	}
 	if albumStr != "" {
-		lookup["album"] = albumStr
+		if albumOID, err := primitive.ObjectIDFromHex(albumStr); err == nil {
+			lookup["album"] = albumOID
+		} else {
+			spew.Dump(err)
+			lookup["album"] = artistStr
+		}
 	}
 
 	var trackCur, trackCountCur *mongo.Cursor
@@ -77,45 +93,42 @@ func (r *Router) TracksIndex(c echo.Context) (err error) {
 		total = tempRes[0]["total"]
 	}
 
-	if limit > 0 && !shuffle {
-		pipe = append(pipe, bson.M{"$limit": limit})
-	}
 	if skip > 0 && !shuffle {
 		pipe = append(pipe, bson.M{"$skip": skip})
 	}
+	if limit > 0 && !shuffle {
+		pipe = append(pipe, bson.M{"$limit": limit})
+	}
 
+	pipe = append(pipe,
+		albumLookup,
+		albumUnwind,
+
+		artistLookup,
+
+		genreLookup,
+		genreUnwind,
+	)
 	if trackCur, err = r.Client.
 		Database(r.Env.DB).
 		Collection("tracks").
-		Aggregate(context.TODO(), append(
-			pipe,
-			bson.M{"$lookup": bson.M{
-				"from":         "albums",
-				"localField":   "album",
-				"foreignField": "_id",
-				"as":           "album",
-			}},
-			bson.M{"$unwind": "$album"},
-
-			bson.M{"$lookup": bson.M{
-				"from":         "artists",
-				"localField":   "artists",
-				"foreignField": "_id",
-				"as":           "artists",
-			}},
-
-			bson.M{"$lookup": bson.M{
-				"from":         "genres",
-				"localField":   "genre",
-				"foreignField": "_id",
-				"as":           "genre",
-			}},
-			bson.M{"$unwind": "$genre"})); err != nil {
+		Aggregate(context.TODO(), pipe); err != nil {
 		return c.JSON(500, err)
 	}
 
+	// spew.Dump(pipe)
+
 	tracks := []map[string]interface{}{}
 	trackCur.All(context.TODO(), &tracks)
+
+	for _, track := range tracks {
+		if track["genre"] == nil {
+			track["genre"] = models.Genre{
+				ID:   primitive.NewObjectID(),
+				Name: "No Genre",
+			}
+		}
+	}
 
 	if shuffle {
 		var (
@@ -138,6 +151,10 @@ func (r *Router) TracksIndex(c echo.Context) (err error) {
 		tracks = n
 	}
 
+	if total == 0 {
+		total = len(tracks)
+	}
+
 	return c.JSON(200, map[string]interface{}{
 		"tracks": tracks,
 		"total":  total,
@@ -146,6 +163,7 @@ func (r *Router) TracksIndex(c echo.Context) (err error) {
 			"limit":   limit,
 			"shuffle": shuffle,
 			"lookup":  lookup,
+			"query":   pipe,
 		},
 	})
 }
@@ -227,28 +245,13 @@ func (r *Router) TracksFavourites(c echo.Context) (err error) {
 		bson.M{"$match": bson.M{
 			"favourited": true,
 		}},
-		bson.M{"$lookup": bson.M{
-			"from":         "albums",
-			"localField":   "album",
-			"foreignField": "_id",
-			"as":           "album",
-		}},
-		bson.M{"$unwind": "$album"},
+		albumLookup,
+		albumUnwind,
 
-		bson.M{"$lookup": bson.M{
-			"from":         "artists",
-			"localField":   "artists",
-			"foreignField": "_id",
-			"as":           "artists",
-		}},
+		artistLookup,
 
-		bson.M{"$lookup": bson.M{
-			"from":         "genres",
-			"localField":   "genre",
-			"foreignField": "_id",
-			"as":           "genre",
-		}},
-		bson.M{"$unwind": "$genre"},
+		genreLookup,
+		genreUnwind,
 	}
 
 	var trackCur *mongo.Cursor
@@ -282,19 +285,9 @@ func (r *Router) TracksNew(c echo.Context) (err error) {
 			"path":       bson.M{"$first": "$path"},
 		},
 		},
-		bson.M{"$lookup": bson.M{
-			"from":         "albums",
-			"localField":   "album",
-			"foreignField": "_id",
-			"as":           "album",
-		}},
-		bson.M{"$lookup": bson.M{
-			"from":         "artists",
-			"localField":   "artists",
-			"foreignField": "_id",
-			"as":           "artists",
-		}},
-		bson.M{"$unwind": bson.M{"path": "$album"}},
+		albumLookup,
+		artistLookup,
+		albumUnwind,
 		bson.M{"$project": bson.M{
 			"_id":        "$track_id",
 			"plays":      "$plays",

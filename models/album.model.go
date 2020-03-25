@@ -20,14 +20,11 @@ type (
 	Album struct {
 		ID        primitive.ObjectID   `json:"_id,omitempty" bson:"_id,omitempty"`
 		Name      string               `json:"name,omitempty" bson:"name,omitempty"`
-		Artist    primitive.ObjectID   `json:"-" bson:"artist,omitempty"`
-		Artists   []primitive.ObjectID `json:"-" bson:"artists,omitempty"`
+		Artist    primitive.ObjectID   `json:"artist" bson:"artist,omitempty"`
+		Artists   []primitive.ObjectID `json:"artists" bson:"artists,omitempty"`
 		Picture   string               `json:"picture,omitempty" bson:"picture,omitempty"`
 		Year      int                  `json:"year,omitempty" bson:"year,omitempty"`
 		CreatedAt time.Time            `json:"created_at,omitempty" bson:"created_at,omitempty"`
-
-		ArtistPop  Artist   `json:"-" bson:"artistPop"`
-		ArtistsPop []Artist `json:"-" bson:"artistsPop"`
 	}
 	// AlbumSearchData - Search data structure for the findOrCreate function
 	AlbumSearchData struct {

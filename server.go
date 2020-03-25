@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/brocococonut/waveline-server-go/routes"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -32,9 +33,9 @@ func auth(next echo.HandlerFunc) echo.HandlerFunc {
 			currentPath := c.Path()
 
 			if contains := any([]string{"art", "play"}, func(pathSnip string) bool {
-				strings.Contains(currentPath, pathSnip)
-				return false
+				return strings.Contains(currentPath, pathSnip)
 			}); contains == true {
+				spew.Dump("continued")
 				return next(c)
 			}
 
@@ -44,6 +45,7 @@ func auth(next echo.HandlerFunc) echo.HandlerFunc {
 			key := c.QueryParam("key")
 
 			if key == "" && keyAlt == "" {
+				println("fucker")
 				return c.String(403, "API key missing")
 			}
 			if keyAlt == "" {
@@ -53,6 +55,7 @@ func auth(next echo.HandlerFunc) echo.HandlerFunc {
 			}
 
 			if apiKey := os.Getenv("API_KEY"); apiKey != reqKey {
+				println("fuckers")
 				return c.String(403, "Invalid API key")
 			}
 

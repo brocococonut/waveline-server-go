@@ -24,20 +24,9 @@ func (r *Router) AlbumsNew(c echo.Context) (err error) {
 		bson.M{"$sort": bson.M{
 			"created_at": -1,
 		}},
-		bson.M{"$lookup": bson.M{
-			"from":         "artists",
-			"localField":   "artist",
-			"foreignField": "_id",
-			"as":           "artist",
-		}},
-		bson.M{"$unwind": "$artist"},
-		bson.M{"$lookup": bson.M{
-			"from":         "artists",
-			"localField":   "artists",
-			"foreignField": "_id",
-			"as":           "artists",
-		}},
-		// bson.M{"$unwind": "$popArtists"},
+		artistLookup,
+		artistUnwind,
+		artistLookup,
 	}
 
 	var albumCur *mongo.Cursor
@@ -102,20 +91,9 @@ func (r *Router) AlbumsIndex(c echo.Context) (err error) {
 		bson.M{"$sort": bson.M{
 			"created_at": -1,
 		}},
-		bson.M{"$lookup": bson.M{
-			"from":         "artists",
-			"localField":   "artist",
-			"foreignField": "_id",
-			"as":           "artist",
-		}},
-		bson.M{"$unwind": "$artist"},
-		bson.M{"$lookup": bson.M{
-			"from":         "artists",
-			"localField":   "artists",
-			"foreignField": "_id",
-			"as":           "artists",
-		}},
-		// bson.M{"$unwind": "$popArtists"},
+		artistLookup,
+		artistUnwind,
+		artistLookup,
 	}
 
 	var albumCur *mongo.Cursor
@@ -145,19 +123,9 @@ func (r *Router) AlbumsArtists(c echo.Context) (err error) {
 		bson.M{"$match": bson.M{
 			"artist": id,
 		}},
-		bson.M{"$lookup": bson.M{
-			"from":         "artists",
-			"localField":   "artist",
-			"foreignField": "_id",
-			"as":           "artist",
-		}},
-		bson.M{"$unwind": "$artist"},
-		bson.M{"$lookup": bson.M{
-			"from":         "artists",
-			"localField":   "artists",
-			"foreignField": "_id",
-			"as":           "artists",
-		}},
+		artistLookup,
+		artistUnwind,
+		artistLookup,
 	}
 
 	var albumCur *mongo.Cursor
@@ -174,14 +142,12 @@ func (r *Router) AlbumsArtists(c echo.Context) (err error) {
 func (r *Router) AlbumsRandom(c echo.Context) (err error) {
 	// albums := []map[string]interface{}{}
 	type tempAlbum struct {
-		Artists    interface{} `json:"artists" bson:"artists"`
-		Year       interface{} `json:"year" bson:"year"`
-		CreatedAt  interface{} `json:"created_at" bson:"created_at"`
-		ID         interface{} `json:"_id" bson:"_id"`
-		Name       interface{} `json:"name" bson:"name"`
-		Artist     interface{} `json:"artist" bson:"artist"`
-		ArtistsPop interface{} `json:"-" bson:"artistsPop"`
-		ArtistPop  interface{} `json:"-" bson:"artistPop"`
+		Artists   interface{} `json:"artists" bson:"artists"`
+		Year      interface{} `json:"year" bson:"year"`
+		CreatedAt interface{} `json:"created_at" bson:"created_at"`
+		ID        interface{} `json:"_id" bson:"_id"`
+		Name      interface{} `json:"name" bson:"name"`
+		Artist    interface{} `json:"artist" bson:"artist"`
 	}
 	albums := []tempAlbum{}
 
@@ -193,19 +159,9 @@ func (r *Router) AlbumsRandom(c echo.Context) (err error) {
 	)
 
 	pipe := []bson.M{
-		bson.M{"$lookup": bson.M{
-			"from":         "artists",
-			"localField":   "artist",
-			"foreignField": "_id",
-			"as":           "artist",
-		}},
-		bson.M{"$unwind": "$artist"},
-		bson.M{"$lookup": bson.M{
-			"from":         "artists",
-			"localField":   "artists",
-			"foreignField": "_id",
-			"as":           "artists",
-		}},
+		artistLookup,
+		artistUnwind,
+		artistLookup,
 	}
 
 	if albumCur, err = r.Client.Database(r.Env.DB).Collection("albums").Aggregate(context.TODO(), pipe); err != nil {
@@ -245,19 +201,9 @@ func (r *Router) AlbumsAlbum(c echo.Context) (err error) {
 		bson.M{"$match": bson.M{
 			"_id": id,
 		}},
-		bson.M{"$lookup": bson.M{
-			"from":         "artists",
-			"localField":   "artist",
-			"foreignField": "_id",
-			"as":           "artist",
-		}},
-		bson.M{"$unwind": "$artist"},
-		bson.M{"$lookup": bson.M{
-			"from":         "artists",
-			"localField":   "artists",
-			"foreignField": "_id",
-			"as":           "artists",
-		}},
+		artistLookup,
+		artistUnwind,
+		artistLookup,
 	}
 
 	var albumCur *mongo.Cursor

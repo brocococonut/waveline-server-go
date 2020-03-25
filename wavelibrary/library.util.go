@@ -2,6 +2,7 @@ package wavelibrary
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -59,6 +60,8 @@ func (l *Library) ExtractMeta(files []fileType) (tracks []models.Track) {
 			continue
 		}
 
+		println(fmt.Sprintf("Loading %s", fileCur.Name()))
+
 		// Attempt to get Metadata from file
 		meta, err := tag.ReadFrom(fileCur)
 		if err != nil && err.Error() != "no tags found" {
@@ -70,6 +73,7 @@ func (l *Library) ExtractMeta(files []fileType) (tracks []models.Track) {
 			// Create artist docs
 			artist := models.Artist{}
 			artists := []models.Artist{}
+
 			if meta.Artist() != "" {
 				if artists, err = artist.FindOrCreate(
 					l.DB,
@@ -105,8 +109,9 @@ func (l *Library) ExtractMeta(files []fileType) (tracks []models.Track) {
 			// Find or create genre
 			var genre models.Genre
 			if meta.Genre() != "" {
+				genreName := meta.Genre()
 				if genreCount, err := l.DB.Collection("genres").CountDocuments(context.TODO(), bson.M{
-					"name": meta.Genre(),
+					"name": genreName,
 				}); genreCount == 0 || err != nil {
 					if err != nil {
 						spew.Dump(err)
@@ -114,7 +119,7 @@ func (l *Library) ExtractMeta(files []fileType) (tracks []models.Track) {
 
 					genre = models.Genre{
 						ID:   primitive.NewObjectID(),
-						Name: meta.Genre(),
+						Name: genreName,
 					}
 
 					if _, err := l.DB.Collection("genres").InsertOne(context.TODO(), genre); err != nil {

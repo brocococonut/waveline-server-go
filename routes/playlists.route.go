@@ -22,13 +22,8 @@ func (r *Router) PlaylistsIndex(c echo.Context) (err error) {
 		bson.M{"$match": bson.M{"favourited": true}},
 		bson.M{"$limit": 4},
 		bson.M{"$sort": bson.M{"created_at": -1}},
-		bson.M{"$lookup": bson.M{
-			"from":         "albums",
-			"localField":   "album",
-			"foreignField": "_id",
-			"as":           "album",
-		}},
-		bson.M{"$unwind": "$album"},
+		albumLookup,
+		albumUnwind,
 	}
 
 	// Run the query
@@ -65,24 +60,9 @@ func (r *Router) PlaylistsIndex(c echo.Context) (err error) {
 	// Retrieve the other playlists
 	playlistPipe := []bson.M{
 		bson.M{"$match": bson.M{}},
-		bson.M{"$lookup": bson.M{
-			"from":         "tracks",
-			"localField":   "tracks",
-			"foreignField": "_id",
-			"as":           "tracks",
-		}},
-		bson.M{"$lookup": bson.M{
-			"from":         "albums",
-			"localField":   "tracks.album",
-			"foreignField": "_id",
-			"as":           "tracks.album",
-		}},
-		bson.M{"$lookup": bson.M{
-			"from":         "artists",
-			"localField":   "tracks.artists",
-			"foreignField": "_id",
-			"as":           "tracks.artists",
-		}},
+		trackLookup,
+		albumLookup,
+		artistLookup,
 		bson.M{
 			"$project": bson.M{
 				"_id":  1,
@@ -224,28 +204,13 @@ func (r *Router) PlaylistsPlaylist(c echo.Context) (err error) {
 				"$in": plist["tracks"],
 			},
 		}},
-		bson.M{"$lookup": bson.M{
-			"from":         "albums",
-			"localField":   "album",
-			"foreignField": "_id",
-			"as":           "album",
-		}},
-		bson.M{"$unwind": "$album"},
+		albumLookup,
+		albumUnwind,
 
-		bson.M{"$lookup": bson.M{
-			"from":         "artists",
-			"localField":   "artists",
-			"foreignField": "_id",
-			"as":           "artists",
-		}},
+		artistLookup,
 
-		bson.M{"$lookup": bson.M{
-			"from":         "genres",
-			"localField":   "genre",
-			"foreignField": "_id",
-			"as":           "genre",
-		}},
-		bson.M{"$unwind": "$genre"},
+		genreLookup,
+		genreUnwind,
 	}
 
 	var tracks []models.TrackExtended

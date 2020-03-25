@@ -15,9 +15,9 @@ func (r *Router) SearchIndex(c echo.Context) (err error) {
 		q string
 	}
 	type searchResults struct {
-		Albums  []models.Album         `json:"albums"`
-		Artists []models.Artist        `json:"artists"`
-		Tracks  []models.TrackExtended `json:"tracks"`
+		Albums  []models.Album           `json:"albums"`
+		Artists []models.Artist          `json:"artists"`
+		Tracks  []map[string]interface{} `json:"tracks"`
 	}
 
 	var (
@@ -42,28 +42,13 @@ func (r *Router) SearchIndex(c echo.Context) (err error) {
 				},
 			},
 		}},
-		bson.M{"$lookup": bson.M{
-			"from":         "albums",
-			"localField":   "album",
-			"foreignField": "_id",
-			"as":           "album",
-		}},
-		bson.M{"$unwind": "$album"},
+		albumLookup,
+		albumUnwind,
 
-		bson.M{"$lookup": bson.M{
-			"from":         "artists",
-			"localField":   "artists",
-			"foreignField": "_id",
-			"as":           "artists",
-		}},
+		artistLookup,
 
-		bson.M{"$lookup": bson.M{
-			"from":         "genres",
-			"localField":   "genre",
-			"foreignField": "_id",
-			"as":           "genre",
-		}},
-		bson.M{"$unwind": "$genre"},
+		genreLookup,
+		genreUnwind,
 	}
 
 	albumPipe := []bson.M{
@@ -74,13 +59,8 @@ func (r *Router) SearchIndex(c echo.Context) (err error) {
 			},
 		}},
 
-		bson.M{"$lookup": bson.M{
-			"from":         "artists",
-			"localField":   "artist",
-			"foreignField": "_id",
-			"as":           "artist",
-		}},
-		bson.M{"$unwind": "$artist"},
+		artistLookup,
+		artistUnwind,
 	}
 
 	var trackCur, albumCur, artistCur *mongo.Cursor
@@ -100,15 +80,15 @@ func (r *Router) SearchIndex(c echo.Context) (err error) {
 
 	if artistCur, err = r.Client.Database(r.Env.DB).Collection("artists").Find(context.TODO(), bson.M{
 		"name": bson.M{
-			"$regex": query,
-			// "$options": "i",
+			"$regex":   query,
+			"$options": "i",
 		},
 	}); err != nil {
 		return c.JSON(500, err)
 	}
 
 	var (
-		tracks  = []models.TrackExtended{}
+		tracks  = []map[string]interface{}{}
 		albums  = []models.Album{}
 		artists = []models.Artist{}
 	)

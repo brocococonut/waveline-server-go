@@ -19,20 +19,9 @@ func (r *Router) ArtistsNew(c echo.Context) (err error) {
 		bson.M{"$sort": bson.M{
 			"created_at": -1,
 		}},
-		bson.M{"$lookup": bson.M{
-			"from":         "artists",
-			"localField":   "artist",
-			"foreignField": "_id",
-			"as":           "artist",
-		}},
-		bson.M{"$unwind": "$artist"},
-		bson.M{"$lookup": bson.M{
-			"from":         "artists",
-			"localField":   "artists",
-			"foreignField": "_id",
-			"as":           "artists",
-		}},
-		// bson.M{"$unwind": "$popArtists"},
+		artistLookup,
+		artistUnwind,
+		artistLookup,
 	}
 
 	var artistCur *mongo.Cursor

@@ -16,16 +16,19 @@ func (r *Router) SystemSync(c echo.Context) (err error) {
 		Env: r.Env,
 	}
 
-	go l.Sync(r.Env.AlbumArtPath, r.Env.MusicPath, []string{".mp3", ".flac", ".m4a"})
+	info, err := l.Sync(r.Env.AlbumArtPath, r.Env.MusicPath, []string{".mp3", ".flac", ".m4a"})
+	if err != nil {
+		return c.JSON(500, models.Info{
+			Tracks:  0,
+			Albums:  0,
+			Artists: 0,
+			Size:    0,
+			Mount:   "",
+		})
+	}
 	// info, err := l.Sync(r.Env.AlbumArtPath, r.Env.MusicPath, []string{".mp3", ".flac", ".m4a"})
 
-	return c.JSON(200, models.Info{
-		Tracks:  0,
-		Albums:  0,
-		Artists: 0,
-		Size:    0,
-		Mount:   "",
-	})
+	return c.JSON(200, info)
 }
 
 // SystemInfo - Waveline info

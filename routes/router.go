@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"go.mongodb.org/mongo-driver/mongo"
+	"gopkg.in/mgo.v2/bson"
 )
 
 type (
@@ -99,3 +100,41 @@ func (r *Router) InitEnv() {
 
 	println(string(stringified))
 }
+
+var albumUnwind = bson.M{"$unwind": bson.M{
+	"path":                       "$album",
+	"preserveNullAndEmptyArrays": true,
+}}
+var artistUnwind = bson.M{"$unwind": bson.M{
+	"path":                       "$artist",
+	"preserveNullAndEmptyArrays": true,
+}}
+var genreUnwind = bson.M{"$unwind": bson.M{
+	"path":                       "$genre",
+	"preserveNullAndEmptyArrays": true,
+}}
+
+var artistLookup = bson.M{"$lookup": bson.M{
+	"from":         "artists",
+	"localField":   "artist",
+	"foreignField": "_id",
+	"as":           "artist",
+}}
+var genreLookup = bson.M{"$lookup": bson.M{
+	"from":         "genres",
+	"localField":   "genre",
+	"foreignField": "_id",
+	"as":           "genre",
+}}
+var albumLookup = bson.M{"$lookup": bson.M{
+	"from":         "albums",
+	"localField":   "album",
+	"foreignField": "_id",
+	"as":           "album",
+}}
+var trackLookup = bson.M{"$lookup": bson.M{
+	"from":         "tracks",
+	"localField":   "tracks",
+	"foreignField": "_id",
+	"as":           "tracks",
+}}
